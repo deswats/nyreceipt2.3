@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Receipt Generator</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Receipt Generator">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+
+    <script>
+        const manifest = {
+            "short_name": "Receipt Generator",
+            "name": "Receipt Generator",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%230f172a'><rect width='512' height='512' rx='110' fill='%231e293b'/><path d='M160 96h192v320L256 368l-96 48V96z' fill='%23ffffff'/><rect x='192' y='160' width='128' height='24' rx='4' fill='%23cbd5e1'/><rect x='192' y='216' width='128' height='16' rx='4' fill='%2394a3b8'/><rect x='192' y='256' width='96' height='16' rx='4' fill='%2394a3b8'/><circle cx='208' cy='320' r='16' fill='%2310b981'/><rect x='240' y='312' width='80' height='16' rx='4' fill='%2310b981'/></svg>",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml",
+                    "purpose": "any"
+                },
+                {
+                    "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%230f172a'><rect width='512' height='512' fill='%231e293b'/><path d='M160 96h192v320L256 368l-96 48V96z' fill='%23ffffff'/><rect x='192' y='160' width='128' height='24' rx='4' fill='%23cbd5e1'/><rect x='192' y='216' width='128' height='16' rx='4' fill='%2394a3b8'/><rect x='192' y='256' width='96' height='16' rx='4' fill='%2394a3b8'/><circle cx='208' cy='320' r='16' fill='%2310b981'/><rect x='240' y='312' width='80' height='16' rx='4' fill='%2310b981'/></svg>",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml",
+                    "purpose": "maskable"
+                }
+            ],
+            "start_url": ".",
+            "background_color": "#f1f5f9",
+            "theme_color": "#0f172a",
+            "display": "standalone",
+            "orientation": "portrait"
+        };
+        const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+    </script>
+
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent: #2563eb;
+            --bg: #f1f5f9;
+            --panel: #ffffff;
+            --border: #cbd5e1;
+            --text: #334155;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            -webkit-user-select: none;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 1150px) {
+            .container { flex-direction: column; padding-bottom: 80px; }
+            body { padding: 5px; }
+        }
+
+        /* Controls Panel */
+        .panel {
+            flex: 1;
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            max-height: 90vh;
+            overflow-y: auto;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel::-webkit-scrollbar { width: 6px; }
+        .panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        h2 { margin-top: 0; color: var(--primary); border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; font-size: 1.3rem;}
+        h3 { font-size: 0.95rem; margin-bottom: 8px; color: var(--accent); }
+
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.8rem; }
+        input[type="text"], input[type="number"], input[type="date"], select, textarea {
+            width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;
+        }
+        textarea { resize: vertical; height: 50px; }
+
+        /* System Action Utilities Grid */
+        .app-action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .btn-system {
+            padding: 10px; font-size: 0.8rem; font-weight: bold; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; background: white; color: var(--text);
+        }
+        #btn-install { background: #2563eb; color: white; border: none; grid-column: span 2; display: none; }
+
+        /* Multi-Row Line Items */
+        .item-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+        .item-desc { flex: 3; }
+        .item-amt { flex: 1.2; }
+        .btn-remove { background: #ef4444; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: bold;}
+        .btn-add { background: #10b981; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+
+        /* ─── SIGNATURE CANVAS — iOS/Android/Desktop ─── */
+        #sig-pad {
+            width: 100%;
+            height: 130px;
+            display: block;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: #fff;
+            cursor: crosshair;
+            /* Critical: stops iOS Safari from treating the canvas as a scroll target */
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            /* Prevent iOS text selection flash */
+            -webkit-tap-highlight-color: transparent;
+        }
+        .sig-canvas-wrap {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .sig-canvas-hint {
+            font-size: 0.68rem;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 3px;
+            font-style: italic;
+        }
+        /* Canvas container — critical touch-action block */
+        .canvas-container {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 6px;
+            touch-action: none;
+            position: relative;
+            -webkit-user-select: none;
+            user-select: none;
+            overflow: hidden;
+        }
+        .btn-clear { background: #64748b; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 4px; }
+        .btn-delete-asset { background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 4px; font-weight: bold; margin-left: 5px; }
+
+        /* Workspace Core Layouts */
+        .preview-panel {
+            flex: 1.2;
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .instructions {
+            background: #eff6ff; color: #1e40af; padding: 10px; border-radius: 6px; font-size: 0.8rem; margin-bottom: 12px; width: 100%; box-sizing: border-box;
+        }
+
+        .document-scroll-wrapper {
+            width: 100%; 
+            overflow-x: auto; 
+            display: flex; 
+            justify-content: center; 
+            background: #cbd5e1; 
+            padding: 15px 0; 
+            border-radius: 8px;
+            /* Allow touch events to pass through for pinch zoom */
+            touch-action: pan-x pan-y;
+        }
+
+        .document-view {
+            width: 595px;
+            min-height: 821px;
+            height: auto;           /* grows with content */
+            background: white;
+            padding: 40px;
+            box-sizing: border-box;
+            position: relative;
+            overflow: visible;      /* never clip content */
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid var(--primary);
+        }
+
+        .document-view.screenshot-mode .draggable-element { border-color: transparent !important; background: transparent !important; }
+        .document-view.screenshot-mode .resize-handle { display: none !important; }
+
+        .doc-top-grid { display: flex; justify-content: space-between; margin-bottom: 35px; min-height: 100px; position: relative; z-index: 5; }
+        
+        .doc-right-meta-container { 
+            text-align: right; 
+            width: 70%; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-end; 
+            justify-content: flex-start;
+            margin-left: auto; 
+        }
+        
+        /* FIXED: Changed to flat text block layer to allow accurate canvas snapshot compiler capturing */
+        .doc-title-text-render { 
+            grid-column: span 2;
+            font-size: 1.85rem; 
+            font-weight: 900; 
+            color: #0f172a; 
+            text-align: right; 
+            width: 100%; 
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+            word-wrap: break-word;
+        }
+        
+        .doc-meta-grid {
+            display: grid;
+            grid-template-columns: auto auto;
+            justify-content: end;
+            align-items: center;
+            row-gap: 4px;
+            column-gap: 3px; 
+            width: 100%;
+        }
+        .doc-meta-label {
+            color: #64748b;
+            font-size: 0.9rem;
+            font-weight: bold;
+            grid-column: 1;
+            text-align: right;
+        }
+        .doc-meta-value {
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-align: right;
+            grid-column: 2;
+            color: #000000 !important;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        
+        /* FIXED: Render text inline so formatting captures safely onto print streams */
+        .doc-date-text-render { 
+            font-size: 0.9rem !important; 
+            color: #000000 !important; 
+            text-align: right; 
+            font-weight: bold !important;
+            display: inline-block;
+            margin: 0;
+        }
+
+        .details-block { margin-top: 15px; margin-bottom: 20px; font-size: 0.85rem; line-height: 1.5; position: relative; z-index: 5;}
+        
+        .receipt-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.82rem; position: relative; z-index: 5; table-layout: fixed; }
+        .receipt-table th { background: #f8fafc; border-bottom: 2px solid #0f172a; text-align: left; padding: 7px 6px; font-weight: 700; word-break: break-word; }
+        .receipt-table th.col-r, .receipt-table td.col-r { text-align: right; }
+        .receipt-table td { padding: 7px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; word-break: break-word; }
+        /* Description gets remaining space; numeric cols are fixed width */
+        .receipt-table .col-desc { width: auto; }
+        .receipt-table .col-qty  { width: 36px; text-align: center; white-space: nowrap; }
+        .receipt-table .col-rate { width: 100px; text-align: right; white-space: nowrap; }
+        .receipt-table .col-amt  { width: 110px; text-align: right; white-space: nowrap; }
+
+        /* Panel item-row — 4 columns */
+        .item-row { display: flex; gap: 5px; margin-bottom: 6px; align-items: center; }
+        .item-row .item-desc { flex: 3; min-width: 0; }
+        .item-row .item-qty  { flex: 0 0 52px; }
+        .item-row .item-rate { flex: 0 0 72px; }
+        .item-row .item-amt  { flex: 0 0 72px; background: #f8fafc; color: #64748b; }
+        /* column header row above items */
+        .item-col-header { display: flex; gap: 5px; margin-bottom: 3px; }
+        .item-col-header span { font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        .item-col-header .h-desc { flex: 3; }
+        .item-col-header .h-qty  { flex: 0 0 52px; text-align: center; }
+        .item-col-header .h-rate { flex: 0 0 72px; text-align: right; }
+        .item-col-header .h-amt  { flex: 0 0 72px; text-align: right; }
+        .item-col-header .h-x   { width: 28px; }
+        
+        .subtotal-row td { border-top: 2px solid #0f172a; padding: 6px 8px; font-size: 0.85rem; color: #475569; white-space: nowrap; }
+        .tax-row td { padding: 4px 8px; font-size: 0.85rem; color: #475569; border-bottom: 1px solid #0f172a; white-space: nowrap; }
+        .total-row td { font-weight: bold; font-size: 1rem; color: #000; padding: 10px 8px; white-space: nowrap; }
+
+        /* Remarks Sheet Layout Element */
+        .doc-remarks-container {
+            margin-top: 25px; font-size: 0.78rem; color: #475569; line-height: 1.4; position: relative; z-index: 5; border-top: 1px dashed #e2e8f0; padding-top: 10px;
+        }
+        .doc-remarks-title { font-weight: bold; margin-bottom: 3px; color: #1e293b; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; }
+        .doc-remarks-body { white-space: pre-line; }
+
+        /* INTERACTIVE DRAG COMPONENTS */
+        .draggable-element {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;          /* Critical: stops iOS scroll hijack */
+            -webkit-touch-callout: none; /* Stops iOS long-press menu */
+            box-sizing: border-box;
+            border: 2px dashed rgba(37,99,235,0.45);
+            border-radius: 5px;
+            padding: 2px;
+            background: rgba(37,99,235,0.03);
+        }
+        .draggable-element:hover,
+        .draggable-element:focus-within {
+            border-color: rgba(37,99,235,0.8);
+            background: rgba(37,99,235,0.05);
+        }
+        .draggable-element img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none;
+            object-fit: contain;
+        }
+
+        /* ── RESIZE HANDLE — always visible, finger-friendly ── */
+        .resize-handle {
+            width: 26px;
+            height: 26px;
+            background: #2563eb;
+            border: 3px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+            position: absolute;
+            right: -13px;
+            bottom: -13px;
+            cursor: se-resize;
+            border-radius: 50%;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: white;
+            line-height: 1;
+        }
+        .resize-handle::after { content: '⤡'; }
+
+        /* ── DRAG LABEL BADGE — shows asset name for easy identification ── */
+        .drag-label {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            font-size: 9px;
+            font-weight: 700;
+            color: #2563eb;
+            background: rgba(255,255,255,0.9);
+            padding: 1px 5px;
+            border-radius: 3px;
+            white-space: nowrap;
+            pointer-events: none;
+            letter-spacing: 0.3px;
+            border: 1px solid rgba(37,99,235,0.3);
+        }
+
+        /* Baseline Positioning Profiles */
+        #logo-drag-container { width: 100px; height: 100px; top: 40px; left: 40px; z-index: 10; display: flex; align-items: center; justify-content: center; }
+        .logo-placeholder-text { font-size: 0.7rem; color: #94a3b8; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; }
+        
+        #sig-drag-container  { width: 130px; height: 65px;  bottom: 130px; right: 40px;  z-index: 98; mix-blend-mode: multiply; background: transparent; }
+        #chop-drag-container { width: 120px; height: 120px; bottom: 120px; right: 170px; z-index: 99; mix-blend-mode: multiply; background: transparent; }
+
+        /* ── CLEAN MODE: hide ALL decoration during PDF capture & print ── */
+        .document-view.screenshot-mode .draggable-element {
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+        }
+        .document-view.screenshot-mode .resize-handle { display: none !important; }
+        .document-view.screenshot-mode .drag-label    { display: none !important; }
+        .document-view.screenshot-mode .logo-placeholder-text { border: none !important; }
+
+        .action-btn { background: var(--accent); color: white; border: none; padding: 14px 28px; border-radius: 6px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 15px; }
+        .pdf-btn { background: #dc2626; margin-top: 15px; }
+
+        /* Asset size controls in panel */
+        .asset-size-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+            align-items: center;
+        }
+        .asset-size-row label { font-size: 0.72rem; color: #64748b; margin: 0; white-space: nowrap; font-weight: 600; }
+        .asset-size-row input[type=number] {
+            width: 64px !important;
+            padding: 6px 6px !important;
+            font-size: 13px !important;
+            text-align: center;
+        }
+
+        /* Opacity row — visible on both desktop and mobile */
+        .asset-opacity-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        .asset-opacity-row input[type=range] {
+            flex: 1;
+            height: 22px;
+            accent-color: #2563eb;
+            cursor: pointer;
+        }
+        .asset-opacity-row span.op-label { white-space: nowrap; font-weight: 600; }
+        .asset-opacity-row span.op-val   { min-width: 36px; font-weight: 700; color: #1e293b; text-align: right; }
+
+        /* ─── MOBILE STYLES ─── */
+        @media (max-width: 768px) {
+            body { padding: 0 0 70px 0; }
+
+            .container { flex-direction: column; gap: 0; padding-bottom: 0; }
+
+            .panel, .preview-panel {
+                border-radius: 0;
+                box-shadow: none;
+                max-height: none;
+                padding: 14px;
+                width: 100%;
+            }
+
+            /* Prevent iOS zoom on input focus — font-size must be ≥16px */
+            input[type="text"], input[type="number"], input[type="date"],
+            select, textarea {
+                font-size: 16px !important;
+                -webkit-appearance: none;
+            }
+
+            h2 { font-size: 1rem; }
+
+            /* Receipt viewer: scrollable wrapper */
+            .document-scroll-wrapper {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding: 10px;
+                justify-content: flex-start;
+            }
+
+            .document-view { transform-origin: top left; }
+
+            /* Bigger touch targets for drag handles */
+            .resize-handle {
+                width: 36px !important;
+                height: 36px !important;
+                right: -18px !important;
+                bottom: -18px !important;
+                border-radius: 50%;
+                font-size: 16px !important;
+            }
+
+            /* Larger tap targets for buttons */
+            .btn-clear, .btn-delete-asset, .btn-add { min-height: 40px; }
+            .btn-remove { min-width: 36px; min-height: 36px; }
+
+            /* Bottom sticky tab bar */
+            .mobile-tabs {
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                display: flex;
+                background: #0f172a;
+                z-index: 9999;
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+                box-shadow: 0 -3px 12px rgba(0,0,0,0.25);
+            }
+            .mobile-tab {
+                flex: 1;
+                padding: 12px 4px 10px;
+                border: none;
+                background: transparent;
+                color: #94a3b8;
+                font-size: 0.65rem;
+                font-weight: 700;
+                cursor: pointer;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 3px;
+                transition: color 0.15s, background 0.15s;
+                -webkit-tap-highlight-color: transparent;
+                min-height: 56px;
+            }
+            .mobile-tab .t-icon { font-size: 1.3rem; line-height: 1; }
+            .mobile-tab.is-active { color: #fff; background: rgba(255,255,255,0.1); }
+
+            #section-edit, #section-preview { scroll-margin-top: 0; }
+
+            /* Floating PDF button */
+            .fab-pdf {
+                position: fixed;
+                bottom: 74px;
+                right: 14px;
+                background: #dc2626;
+                color: #fff;
+                border: none;
+                border-radius: 28px;
+                padding: 13px 18px;
+                font-size: 0.82rem;
+                font-weight: 700;
+                box-shadow: 0 4px 14px rgba(220,38,38,0.45);
+                cursor: pointer;
+                z-index: 9998;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-height: 48px;
+            }
+
+            #btn-action-pdf { display: none; }
+
+            /* Zoom bar */
+            .zoom-bar {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                padding: 8px 0 4px;
+                width: 100%;
+            }
+            .zoom-bar button {
+                background: #1e293b;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                width: 40px; height: 40px;
+                font-size: 1.2rem;
+                cursor: pointer;
+                display: flex; align-items: center; justify-content: center;
+                min-height: 40px;
+            }
+            .zoom-bar span { font-size: 0.8rem; font-weight: 700; color: #475569; min-width: 44px; text-align: center; }
+
+            /* Signature canvas bigger on mobile */
+            #sig-pad { height: 160px !important; }
+
+            /* Item row — stack compact on narrow screens */
+            .item-row { flex-wrap: wrap; }
+            .item-row .item-desc { flex: 1 1 100%; }
+            .item-row .item-qty  { flex: 1 1 60px; }
+            .item-row .item-rate { flex: 1 1 80px; }
+            .item-row .item-amt  { flex: 1 1 80px; }
+        }
+
+        @media (min-width: 769px) {
+            .asset-opacity-row { display: flex; }
+        }
+
+        /* ── MULTI-TAX PANEL ── */
+        .tax-row-card {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+        }
+        .tax-row-card input[type="text"] {
+            flex: 2;
+            font-size: 13px !important;
+            padding: 7px 8px !important;
+            font-weight: 600;
+        }
+        .tax-row-card input[type="number"] {
+            flex: 1;
+            font-size: 13px !important;
+            padding: 7px 8px !important;
+            text-align: center;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .tax-row-card .tax-pct-lbl {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #64748b;
+            flex-shrink: 0;
+        }
+        .tax-row-card .tax-enable-toggle {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            flex-shrink: 0;
+            accent-color: var(--accent);
+        }
+        .tax-row-card .btn-del-tax {
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* tax rows on the receipt document */
+        .tax-output-row td { padding: 3px 8px; font-size: 0.82rem; }
+        .tax-output-row td:last-child { text-align: right; }
+
+        @media print {
+            body { padding: 0; background: white; }
+            .container { gap: 0; }
+            .panel, .instructions, .action-btn, h2, .resize-handle, .logo-placeholder-text, .btn-remove, .document-scroll-wrapper, .app-footer-credits { display: none !important; }
+            .preview-panel { padding: 0; background: none; box-shadow: none; display: block; }
+            .document-view { border: none; box-shadow: none; padding: 0; width: 100%; position: absolute; left: 0; top: 0; }
+            .draggable-element { border: none !important; background: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="panel" id="section-edit">
+        <h2 id="lang-panel-title">🧾 My Receipt Generator V1.7</h2>
+        
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="lang-selector" style="color: var(--accent); font-size: 0.8rem;">🌐 Language / Bahasa</label>
+            <select id="lang-selector" onchange="toggleAppLanguage(this.value)" style="border: 1px solid var(--accent); font-weight: bold;">
+                <option value="en">English</option>
+                <option value="ms">Bahasa Melayu</option>
+            </select>
+        </div>
+
+        <div class="app-action-grid">
+            <button id="btn-install" class="btn-system">📱 Install App onto Device Screen</button>
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-custom-title" for="custom-title-input">Custom Document Heading Text</label>
+            <input type="text" id="custom-title-input" value="OFFICIAL RECEIPT" oninput="syncTitleHeading()">
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-doc-num" for="rec-number">Receipt / Invoice Number</label>
+            <input type="text" id="rec-number" value="TX-2026-8892" oninput="updateLivePreview()">
+        </div>
+
+        <!-- TAX REFERENCE — appears between Receipt No and Date on the receipt -->
+        <div class="form-group" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;font-weight:700;color:#166534;margin-bottom:0;">
+                <input type="checkbox" id="tax-ref-toggle" onchange="toggleTaxRef()" style="width:16px;height:16px;margin:0;accent-color:#16a34a;">
+                Include Tax / GST Registration Number
+            </label>
+            <div id="tax-ref-group" style="display:none;margin-top:8px;">
+                <label style="font-size:0.72rem;font-weight:600;color:#475569;margin-bottom:3px;display:block;">Tax / GST Reg. No.</label>
+                <input type="text" id="tax-ref-number" placeholder="e.g. GST-001234567890" oninput="updateLivePreview()" style="font-weight:600;letter-spacing:0.5px;">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="currency-selector">🌍 Currency</label>
+            <select id="currency-selector" onchange="updateLivePreview()" style="font-size:14px;">
+                <option value="RM">🇲🇾 MYR — Malaysian Ringgit (RM)</option>
+                <option value="$">🇺🇸 USD — US Dollar ($)</option>
+                <option value="€">🇪🇺 EUR — Euro (€)</option>
+                <option value="£">🇬🇧 GBP — British Pound (£)</option>
+                <option value="¥">🇯🇵 JPY — Japanese Yen (¥)</option>
+                <option value="¥">🇨🇳 CNY — Chinese Yuan (¥)</option>
+                <option value="₩">🇰🇷 KRW — South Korean Won (₩)</option>
+                <option value="₹">🇮🇳 INR — Indian Rupee (₹)</option>
+                <option value="Rp">🇮🇩 IDR — Indonesian Rupiah (Rp)</option>
+                <option value="฿">🇹🇭 THB — Thai Baht (฿)</option>
+                <option value="₱">🇵🇭 PHP — Philippine Peso (₱)</option>
+                <option value="S$">🇸🇬 SGD — Singapore Dollar (S$)</option>
+                <option value="₫">🇻🇳 VND — Vietnamese Dong (₫)</option>
+                <option value="K">🇲🇲 MMK — Myanmar Kyat (K)</option>
+                <option value="৳">🇧🇩 BDT — Bangladeshi Taka (৳)</option>
+                <option value="Rs">🇵🇰 PKR — Pakistani Rupee (Rs)</option>
+                <option value="LKR">🇱🇰 LKR — Sri Lankan Rupee (LKR)</option>
+                <option value="A$">🇦🇺 AUD — Australian Dollar (A$)</option>
+                <option value="NZ$">🇳🇿 NZD — New Zealand Dollar (NZ$)</option>
+                <option value="C$">🇨🇦 CAD — Canadian Dollar (C$)</option>
+                <option value="CHF">🇨🇭 CHF — Swiss Franc (CHF)</option>
+                <option value="kr">🇸🇪 SEK — Swedish Krona (kr)</option>
+                <option value="kr">🇳🇴 NOK — Norwegian Krone (kr)</option>
+                <option value="kr">🇩🇰 DKK — Danish Krone (kr)</option>
+                <option value="zł">🇵🇱 PLN — Polish Zloty (zł)</option>
+                <option value="Kč">🇨🇿 CZK — Czech Koruna (Kč)</option>
+                <option value="Ft">🇭🇺 HUF — Hungarian Forint (Ft)</option>
+                <option value="₺">🇹🇷 TRY — Turkish Lira (₺)</option>
+                <option value="₽">🇷🇺 RUB — Russian Ruble (₽)</option>
+                <option value="﷼">🇸🇦 SAR — Saudi Riyal (﷼)</option>
+                <option value="د.إ">🇦🇪 AED — UAE Dirham (د.إ)</option>
+                <option value="﷼">🇮🇷 IRR — Iranian Rial (﷼)</option>
+                <option value="د.ك">🇰🇼 KWD — Kuwaiti Dinar (د.ك)</option>
+                <option value="QR">🇶🇦 QAR — Qatari Riyal (QR)</option>
+                <option value="BD">🇧🇭 BHD — Bahraini Dinar (BD)</option>
+                <option value="OMR">🇴🇲 OMR — Omani Rial (OMR)</option>
+                <option value="₪">🇮🇱 ILS — Israeli Shekel (₪)</option>
+                <option value="₦">🇳🇬 NGN — Nigerian Naira (₦)</option>
+                <option value="KSh">🇰🇪 KES — Kenyan Shilling (KSh)</option>
+                <option value="R">🇿🇦 ZAR — South African Rand (R)</option>
+                <option value="GH₵">🇬🇭 GHS — Ghanaian Cedi (GH₵)</option>
+                <option value="EGP">🇪🇬 EGP — Egyptian Pound (EGP)</option>
+                <option value="R$">🇧🇷 BRL — Brazilian Real (R$)</option>
+                <option value="$">🇲🇽 MXN — Mexican Peso ($)</option>
+                <option value="$">🇦🇷 ARS — Argentine Peso ($)</option>
+                <option value="CLP">🇨🇱 CLP — Chilean Peso (CLP)</option>
+                <option value="COP">🇨🇴 COP — Colombian Peso (COP)</option>
+                <option value="S/.">🇵🇪 PEN — Peruvian Sol (S/.)</option>
+                <option value="Bs">🇻🇪 VES — Venezuelan Bolívar (Bs)</option>
+                <option value="HK$">🇭🇰 HKD — Hong Kong Dollar (HK$)</option>
+                <option value="NT$">🇹🇼 TWD — New Taiwan Dollar (NT$)</option>
+                <option value="₴">🇺🇦 UAH — Ukrainian Hryvnia (₴)</option>
+                <option value="lei">🇷🇴 RON — Romanian Leu (lei)</option>
+                <option value="лв">🇧🇬 BGN — Bulgarian Lev (лв)</option>
+                <option value="kn">🇭🇷 HRK — Croatian Kuna (kn)</option>
+                <option value="din">🇷🇸 RSD — Serbian Dinar (din)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-doc-date">Document Date / Tarikh Dokumen</label>
+            <input type="date" id="control-date-picker" onchange="syncDateFromPicker(this.value)">
+        </div>
+
+        <div class="form-group">
+            <label style="font-weight:700;color:var(--primary);font-size:0.85rem;">🧾 Taxes</label>
+
+            <!-- Tax rows container -->
+            <div id="tax-rows-panel" style="margin-top:8px;"></div>
+
+            <!-- Add tax buttons -->
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                <button onclick="addTaxRow('SST','6')" style="padding:7px 12px;background:#0284c7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.76rem;font-weight:700;">＋ SST</button>
+                <button onclick="addTaxRow('GST','0')" style="padding:7px 12px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.76rem;font-weight:700;">＋ GST</button>
+                <button onclick="addTaxRow('VAT','0')" style="padding:7px 12px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.76rem;font-weight:700;">＋ VAT</button>
+                <button onclick="addTaxRow('','0')" style="padding:7px 12px;background:#64748b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.76rem;font-weight:700;">＋ Custom Tax</button>
+            </div>
+            <p style="font-size:0.7rem;color:#94a3b8;margin-top:6px;">Each tax is calculated on the subtotal. Multiple taxes stack independently.</p>
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-header-info" for="company-details">Your Corporate Profile Header</label>
+            <textarea id="company-details" oninput="updateLivePreview()">Apex Global Solutions Ltd&#10;100 Innovation Way, Tech District</textarea>
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-client-info" for="client-details">Client Bill To / Received From Details</label>
+            <textarea id="client-details" placeholder="Client Name, Corporate Address, Contact Info" oninput="updateLivePreview()"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-remarks" for="custom-remarks-input">Warranty Clauses & Additional Remarks</label>
+            <textarea id="custom-remarks-input" placeholder="Enter warranty info, validation timeline, or special terms..." oninput="updateLivePreview()">Warranty Period: 12 Months from document date covering standard service implementation and technical adjustments. Void if alignment is altered by uncertified third-party providers.</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="auth-rep-input">✍️ Authorised Representative Name / Title</label>
+            <input type="text" id="auth-rep-input" value="Authorized Representative" placeholder="e.g. John Doe · Director of Operations" oninput="syncAuthRep()">
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <h3 id="lang-section-items" style="margin: 0;">Purchases & Service Descriptions</h3>
+            <button id="btn-add-row" class="btn-add" onclick="addItemRow()">+ Add Row</button>
+        </div>
+        <!-- Column headers -->
+        <div class="item-col-header">
+            <span class="h-desc" id="lang-col-desc">Description</span>
+            <span class="h-qty" id="lang-col-qty">Qty</span>
+            <span class="h-rate" id="lang-col-rate">Unit Price</span>
+            <span class="h-amt" id="lang-col-amt">Amount</span>
+            <span class="h-x"></span>
+        </div>
+        <div id="items-container"></div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+
+        <h3>Visual Business Assets</h3>
+        <div class="form-group">
+            <label id="lang-lbl-upload-logo" for="upload-logo">Company Logo (File upload / Camera snap)</label>
+            <input type="file" id="upload-logo" accept="image/*" onchange="handleLogoUpload(event)">
+            <button class="btn-delete-asset" id="lang-btn-del-logo" onclick="deleteTargetVisualAsset('logo')">🗑️ Delete Logo</button>
+            <div class="asset-size-row">
+                <label>W</label>
+                <input type="number" value="100" min="20" max="400" id="size-logo-w" oninput="setAssetSize('logo')"> px
+                <label style="margin-left:6px;">H</label>
+                <input type="number" value="100" min="20" max="400" id="size-logo-h" oninput="setAssetSize('logo')"> px
+            </div>
+            <div class="asset-opacity-row">
+                <span class="op-label">Opacity</span>
+                <input type="range" min="10" max="100" value="100" oninput="setAssetOpacity('logo',this.value)" id="opacity-logo">
+                <span class="op-val" id="opacity-logo-val">100%</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-draw-sig">✍️ Draw Signature (Finger / Stylus / Mouse)</label>
+            <div id="sig-draw-area" style="
+                position:relative;width:100%;height:150px;
+                border:2px solid #cbd5e1;border-radius:8px;
+                background:#fff;overflow:hidden;
+                -webkit-user-select:none;user-select:none;
+                -webkit-touch-callout:none;touch-action:none;
+                cursor:crosshair;">
+                <canvas id="sig-canvas" style="
+                    position:absolute;top:0;left:0;width:100%;height:100%;
+                    touch-action:none;-webkit-touch-callout:none;
+                    -webkit-user-select:none;user-select:none;
+                    display:block;cursor:crosshair;"></canvas>
+                <div id="sig-placeholder" style="
+                    position:absolute;inset:0;display:flex;align-items:center;
+                    justify-content:center;color:#94a3b8;font-size:0.82rem;
+                    font-style:italic;pointer-events:none;">
+                    ✍️ Sign here with finger, stylus or mouse
+                </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                <button id="btn-clear-sig" onclick="clearSigSVG()" style="
+                    padding:8px 14px;background:#e2e8f0;color:#475569;border:none;
+                    border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:700;
+                    min-height:40px;">🔄 Clear</button>
+                <button class="btn-delete-asset" id="lang-btn-del-sig" onclick="deleteTargetVisualAsset('sig')" style="min-height:40px;">🗑️ Delete</button>
+            </div>
+            <div class="asset-size-row">
+                <label>W</label>
+                <input type="number" value="130" min="20" max="400" id="size-sig-w" oninput="setAssetSize('sig')"> px
+                <label style="margin-left:6px;">H</label>
+                <input type="number" value="65" min="20" max="400" id="size-sig-h" oninput="setAssetSize('sig')"> px
+            </div>
+            <div class="asset-opacity-row">
+                <span class="op-label">Opacity</span>
+                <input type="range" min="10" max="100" value="100" oninput="setAssetOpacity('sig',this.value)" id="opacity-sig">
+                <span class="op-val" id="opacity-sig-val">100%</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-upload-sig" for="upload-sig">Or Upload Signature Image File</label>
+            <input type="file" id="upload-sig" accept="image/*" onchange="handleSignatureUpload(event)">
+        </div>
+
+        <div class="form-group">
+            <label id="lang-lbl-upload-chop" for="upload-chop">Upload Company Stamp / Chop</label>
+            <input type="file" id="upload-chop" accept="image/*" onchange="handleChopUpload(event)">
+            <button class="btn-delete-asset" id="lang-btn-del-chop" onclick="deleteTargetVisualAsset('chop')">🗑️ Delete Chop</button>
+            <div class="asset-size-row">
+                <label>W</label>
+                <input type="number" value="120" min="20" max="400" id="size-chop-w" oninput="setAssetSize('chop')"> px
+                <label style="margin-left:6px;">H</label>
+                <input type="number" value="120" min="20" max="400" id="size-chop-h" oninput="setAssetSize('chop')"> px
+            </div>
+            <div class="asset-opacity-row">
+                <span class="op-label">Opacity</span>
+                <input type="range" min="10" max="100" value="100" oninput="setAssetOpacity('chop',this.value)" id="opacity-chop">
+                <span class="op-val" id="opacity-chop-val">100%</span>
+            </div>
+        </div>
+
+        <div class="app-footer-credits">
+            <b>DW Labs</b><br>
+            Kota Kinabalu, Sabah
+        </div>
+    </div>
+
+    <div class="preview-panel" id="section-preview">
+        <h2 id="lang-preview-title">Interactive Workspace Studio</h2>
+        <div id="lang-msg-autosave" class="instructions">
+            💾 Device auto-save is Active. Your layouts, configurations, and component position tracking are preserved locally on this device.
+        </div>
+
+        <!-- Mobile zoom controls — hidden on desktop via CSS -->
+        <div class="zoom-bar" id="zoom-bar">
+            <button onclick="adjustReceiptZoom(-0.1)">−</button>
+            <span id="zoom-label">100%</span>
+            <button onclick="adjustReceiptZoom(0.1)">+</button>
+            <button onclick="resetReceiptZoom()" style="width:auto;padding:0 10px;font-size:0.75rem;">Fit</button>
+        </div>
+        
+        <div class="document-scroll-wrapper">
+            <div class="document-view" id="invoice-workspace">
+                
+                <div class="doc-top-grid">
+                    <div style="width: 110px;"></div> 
+                    
+                    <div class="doc-right-meta-container">
+                        <div class="doc-meta-grid">
+                            <div id="lbl-doc-type" class="doc-title-text-render">OFFICIAL RECEIPT</div>
+                            
+                            <span class="doc-meta-label" id="lang-doc-no-prefix">No:</span>
+                            <span class="doc-meta-value" id="lbl-rec-num">---</span>
+
+                            <!-- Tax Reference Row — shown only when ticked -->
+                            <span class="doc-meta-label" id="lbl-tax-ref-prefix" style="display:none;">Tax Reg:</span>
+                            <span class="doc-meta-value" id="lbl-tax-ref-out" style="display:none;font-weight:700;color:#166534;letter-spacing:0.4px;">—</span>
+
+                            <span class="doc-meta-label" id="lang-doc-date-prefix">Date:</span>
+                            <span class="doc-meta-value">
+                                <div id="lbl-date" class="doc-date-text-render">13/06/2026</div>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 30px;" class="details-block">
+                    <div style="flex: 1;">
+                        <strong id="lang-doc-from" style="color: #64748b; font-size: 0.7rem; text-transform: uppercase;">Issued From:</strong>
+                        <div id="lbl-comp-info" style="white-space: pre-line; font-weight: bold;"></div>
+                    </div>
+                    <div style="flex: 1;">
+                        <strong id="lang-doc-to" style="color: #64748b; font-size: 0.7rem; text-transform: uppercase;">Transaction To:</strong>
+                        <div id="lbl-client-info" style="white-space: pre-line; font-weight: bold; font-size: 0.95rem;"></div>
+                    </div>
+                </div>
+
+                <table class="receipt-table">
+                    <thead>
+                        <tr>
+                            <th id="lang-table-head-desc">Item Description &amp; Purchase Breakdown</th>
+                            <th class="col-qty" id="lang-table-head-qty">Qty</th>
+                            <th class="col-rate" id="lang-table-head-rate">Unit Price</th>
+                            <th class="col-amt" id="lang-table-head-amt">Amount (<span id="lbl-currency-header">RM</span>)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-bill-rows"></tbody>
+                    
+                    <tr class="subtotal-row" id="render-row-subtotal" style="display:none;">
+                        <td colspan="3" id="lang-lbl-subtotal" style="text-align: right; font-weight: 600;">Subtotal</td>
+                        <td class="col-amt" style="font-weight: 600;" id="lbl-calculated-subtotal">0.00</td>
+                    </tr>
+                    <!-- Dynamic tax output rows injected here by JS -->
+                    <tbody id="tax-output-tbody"></tbody>
+                    <tr class="total-row">
+                        <td colspan="3" id="lang-table-total" style="text-align: right;">Total Amount Paid</td>
+                        <td class="col-amt" id="lbl-grand-total">0.00</td>
+                    </tr>
+                </table>
+
+                <div class="doc-remarks-container" id="remarks-render-block">
+                    <div class="doc-remarks-title" id="lang-doc-remarks-header">Warranty Terms & Remarks</div>
+                    <div class="doc-remarks-body" id="lbl-custom-remarks"></div>
+                </div>
+
+                <div style="margin-top: auto; padding-top: 40px; display: flex; justify-content: space-between; font-size: 0.8rem; position: relative; z-index: 5;">
+                    <div><p id="lang-doc-footer-note" style="color: #94a3b8;">System generated financial accounting document.</p></div>
+                    <div style="text-align: center; width: 170px;">
+                        <div id="lang-doc-sign-line" style="border-top: 1px dashed #000; margin-top: 45px; padding-top: 4px; font-weight: bold;"><span id="lbl-auth-rep">Authorized Representative</span></div>
+                    </div>
+                </div>
+
+                <div class="draggable-element" id="logo-drag-container">
+                    <div class="drag-label">LOGO · drag / resize ⤡</div>
+                    <div class="logo-placeholder-text" id="logo-prompt">Upload Logo</div>
+                    <img id="layer-logo" src="" style="display: none;">
+                    <div class="resize-handle"></div>
+                </div>
+
+                <div class="draggable-element" id="sig-drag-container">
+                    <div class="drag-label">SIGNATURE · drag / resize ⤡</div>
+                    <img id="layer-sig" src="" style="display: none;">
+                    <div class="resize-handle"></div>
+                </div>
+
+                <div class="draggable-element" id="chop-drag-container">
+                    <div class="drag-label">STAMP · drag / resize ⤡</div>
+                    <img id="layer-chop" src="" style="display: none;">
+                    <div class="resize-handle"></div>
+                </div>
+
+            </div>
+        </div>
+        
+        <button id="btn-action-pdf" class="action-btn pdf-btn" onclick="generateHDReceiptReportPDF()">📄 Save Document as PDF</button>
+    </div>
+</div>
+
+<script>
+    // System Dictionary Engine Matrix
+    const languageDictionary = {
+        en: {
+            panelTitle: "My Receipt Generator V1.7",
+            installBtn: "📱 Install App onto Device Screen",
+            lblCustomTitle: "Custom Document Heading Text",
+            lblDocNum: "Receipt / Invoice Number",
+            lblDocDate: "Document Date / Tarikh Dokumen",
+            lblHeaderInfo: "Your Corporate Profile Header",
+            lblClientInfo: "Client Bill To / Received From Details (Bold)",
+            lblRemarks: "Warranty Clauses & Additional Remarks",
+            sectionItems: "Purchases & Service Descriptions",
+            btnAddRow: "+ Add Row",
+            sectionAssets: "Visual Business Assets",
+            lblUploadLogo: "Company Logo (File upload / Camera snap)",
+            btnDelLogo: "🗑️ Delete Logo",
+            lblDrawSig: "Draw Signature Layer (Smartpen/Finger Native Control)",
+            btnClearSig: "Reset Drawn Line",
+            btnDelSig: "🗑️ Delete Signature",
+            lblUploadSig: "Or Upload Signature Image File",
+            lblUploadChop: "Upload Company Stamp / Chop",
+            btnDelChop: "🗑️ Delete Chop",
+            previewTitle: "Interactive Workspace Studio",
+            msgAutosave: "💾 Device auto-save is Active. Your layouts, configurations, and component position tracking are preserved locally on this device.",
+            docNoPrefix: "No:",
+            docDatePrefix: "Date:",
+            docFrom: "Issued From:",
+            docTo: "Transaction To:",
+            tableHeadDesc: "Item Description & Purchase Breakdown",
+            tableHeadQty:  "Qty",
+            tableHeadRate: "Unit Price",
+            tableHeadAmt:  "Amount",
+            colDesc:       "Description",
+            colQty:        "Qty",
+            colRate:       "Unit Price",
+            colAmt:        "Amount",
+            lblSubtotal: "Subtotal",
+            lblTaxLine: "Service Tax",
+            tableTotal: "Total Amount Paid",
+            docRemarksHeader: "Warranty Terms & Remarks",
+            docFooterNote: "System generated financial accounting document.",
+            docSignLine: "Authorized Representative",
+            logoPrompt: "Upload Logo"
+        },
+        ms: {
+            panelTitle: "My Receipt Generator V1.7",
+            installBtn: "📱 Pasang Aplikasi ke Skrin Peranti",
+            lblCustomTitle: "Teks Tajuk Dokumen Kustom",
+            lblDocNum: "Nombor Resit / Invois",
+            lblDocDate: "Document Date / Tarikh Dokumen",
+            lblHeaderInfo: "Maklumat Profil Korporat (Kepala Surat)",
+            lblClientInfo: "Butiran Pelanggan (Bil Kepada / Diterima Daripada) (Tulisan Tebal)",
+            lblRemarks: "Fasal Waranti & Kenyataan Tambahan",
+            sectionItems: "Perihalan Pembelian & Perkhidmatan",
+            btnAddRow: "+ Tambah Baris",
+            sectionAssets: "Aset Visual Perniagaan",
+            lblUploadLogo: "Logo Syarikat (Muat naik Fail / Tangkap Gambar peranti)",
+            btnDelLogo: "🗑️ Padam Logo",
+            lblDrawSig: "Lakaran Tandatangan (Kawalan Pintar Skrin/Pen Semulajadi)",
+            btnClearSig: "Padam Lakaran Garisan",
+            btnDelSig: "🗑️ Padam Tandatangan",
+            lblUploadSig: "Atau Muat Naik Fail Gambar Tandatangan",
+            lblUploadChop: "Muat Naik Cap / Chop Syarikat",
+            btnDelChop: "Wakil Kuasa Yang Sah",
+            previewTitle: "Studio Ruang Kerja Interaktif",
+            msgAutosave: "💾 Simpanan automatik peranti Aktif. Rangka letak fail, konfigurasi, dan penjejakan kedudukan komponen disimpan secara lokal pada peranti ini.",
+            docNoPrefix: "No:",
+            docDatePrefix: "Tarikh:",
+            docFrom: "Dikeluarkan Oleh:",
+            docTo: "Transaksi Kepada:",
+            tableHeadDesc: "Perihalan Item & Pecahan Pembelian",
+            tableHeadQty:  "Kuantiti",
+            tableHeadRate: "Harga Seunit",
+            tableHeadAmt:  "Jumlah",
+            colDesc:       "Perihalan",
+            colQty:        "Kuantiti",
+            colRate:       "Harga Seunit",
+            colAmt:        "Jumlah",
+            lblSubtotal: "Jumlah Kecil",
+            lblTaxLine: "Cukai Perkhidmatan",
+            tableTotal: "Jumlah Amaun Dibayar",
+            docRemarksHeader: "Syarat Waranti & Nota Tambahan",
+            docFooterNote: "Dokumen kewangan dan perakaunan janaan sistem.",
+            logoPrompt: "Muat Naik Logo"
+        }
+    };
+
+    let currentSelectedLanguage = "en";
+
+    function toggleAppLanguage(langKey) {
+        currentSelectedLanguage = langKey;
+        const dict = languageDictionary[langKey];
+
+        document.getElementById('lang-panel-title').textContent = dict.panelTitle;
+        document.getElementById('btn-install').textContent = dict.installBtn;
+        document.getElementById('lang-lbl-custom-title').textContent = dict.lblCustomTitle;
+        document.getElementById('lang-lbl-doc-num').textContent = dict.lblDocNum;
+        document.getElementById('lang-lbl-doc-date').textContent = dict.lblDocDate;
+        document.getElementById('lang-lbl-header-info').textContent = dict.lblHeaderInfo;
+        document.getElementById('lang-lbl-client-info').textContent = dict.lblClientInfo;
+        document.getElementById('lang-lbl-remarks').textContent = dict.lblRemarks;
+        document.getElementById('lang-section-items').textContent = dict.sectionItems;
+        document.getElementById('btn-add-row').textContent = dict.btnAddRow;
+        document.getElementById('lang-section-assets').textContent = dict.sectionAssets;
+        document.getElementById('lang-lbl-upload-logo').textContent = dict.lblUploadLogo;
+        document.getElementById('lang-btn-del-logo').textContent = dict.btnDelLogo;
+        document.getElementById('lang-lbl-draw-sig').textContent = dict.lblDrawSig;
+        document.getElementById('btn-clear-sig').textContent = dict.btnClearSig;
+        document.getElementById('lang-btn-del-sig').textContent = dict.btnDelSig;
+        document.getElementById('lang-lbl-upload-sig').textContent = dict.lblUploadSig;
+        document.getElementById('lang-lbl-upload-chop').textContent = dict.lblUploadChop;
+        document.getElementById('lang-btn-del-chop').textContent = dict.btnDelChop;
+        
+        document.getElementById('lang-preview-title').textContent = dict.previewTitle;
+        document.getElementById('lang-msg-autosave').innerHTML = dict.msgAutosave;
+        document.getElementById('lang-doc-no-prefix').textContent = dict.docNoPrefix;
+        document.getElementById('lang-doc-date-prefix').textContent = dict.docDatePrefix;
+        document.getElementById('lang-doc-from').textContent = dict.docFrom;
+        document.getElementById('lang-doc-to').textContent = dict.docTo;
+        document.getElementById('lang-table-head-desc').textContent = dict.tableHeadDesc;
+        document.getElementById('lang-table-head-qty').textContent  = dict.tableHeadQty;
+        document.getElementById('lang-table-head-rate').textContent = dict.tableHeadRate;
+        // preserve the currency span inside amt header
+        const amtHeader = document.getElementById('lang-table-head-amt');
+        const currSpan  = document.getElementById('lbl-currency-header');
+        amtHeader.textContent = dict.tableHeadAmt + ' (';
+        amtHeader.appendChild(currSpan);
+        amtHeader.appendChild(document.createTextNode(')'));
+        // panel column headers
+        document.getElementById('lang-col-desc').textContent = dict.colDesc;
+        document.getElementById('lang-col-qty').textContent  = dict.colQty;
+        document.getElementById('lang-col-rate').textContent = dict.colRate;
+        document.getElementById('lang-col-amt').textContent  = dict.colAmt;
+        document.getElementById('lang-lbl-subtotal').textContent = dict.lblSubtotal;
+        document.getElementById('lang-table-total').textContent  = dict.tableTotal;
+        document.getElementById('lang-doc-remarks-header').textContent = dict.docRemarksHeader;
+        document.getElementById('lang-doc-footer-note').textContent = dict.docFooterNote;
+        document.getElementById('lang-doc-sign-line').textContent = dict.docSignLine;
+        
+        const promptZone = document.getElementById('logo-prompt');
+        if (promptZone && promptZone.style.display !== 'none') promptZone.textContent = dict.logoPrompt;
+
+        saveCurrentState();
+    }
+
+    // FIXED: Date element sets string value natively to allow safe rendering onto print formats
+    function syncDateFromPicker(val) {
+        if(!val) return;
+        const dSplit = val.split('-');
+        const formattedDate = `${dSplit[2]}/${dSplit[1]}/${dSplit[0]}`;
+        document.getElementById('lbl-date').textContent = formattedDate;
+        saveCurrentState();
+    }
+
+    // FIXED: Form mappings clone directly into clean string elements 
+    function syncTitleHeading() { 
+        document.getElementById('lbl-doc-type').textContent = document.getElementById('custom-title-input').value; 
+        saveCurrentState(); 
+    }
+    function syncAuthRep() {
+        const val = document.getElementById('auth-rep-input').value.trim();
+        document.getElementById('lbl-auth-rep').textContent = val || 'Authorized Representative';
+        saveCurrentState();
+    }
+
+    // ── TAX REFERENCE NUMBER TOGGLE ──
+    function toggleTaxRef() {
+        const enabled = document.getElementById('tax-ref-toggle').checked;
+        document.getElementById('tax-ref-group').style.display = enabled ? 'block' : 'none';
+        updateLivePreview();
+    }
+
+    // ── MULTI-TAX ROW MANAGER ──
+    let taxRowCounter = 0;
+    function addTaxRow(name, pct, enabled = true) {
+        taxRowCounter++;
+        const id = 'tax-card-' + taxRowCounter;
+        const container = document.getElementById('tax-rows-panel');
+        const card = document.createElement('div');
+        card.className = 'tax-row-card';
+        card.id = id;
+        card.innerHTML = `
+            <input type="checkbox" class="tax-enable-toggle" ${enabled ? 'checked' : ''} onchange="updateLivePreview()" title="Enable/Disable this tax">
+            <input type="text" value="${name || ''}" placeholder="Tax name (e.g. SST)" oninput="updateLivePreview()">
+            <input type="number" value="${pct || 0}" min="0" max="100" step="0.01" placeholder="%" oninput="updateLivePreview()" style="width:60px;">
+            <span class="tax-pct-lbl">%</span>
+            <button class="btn-del-tax" onclick="document.getElementById('${id}').remove(); updateLivePreview();" title="Remove this tax">×</button>
+        `;
+        container.appendChild(card);
+        updateLivePreview();
+    }
+    // Dynamic Item Control Array — 4 columns: Description, Qty, Unit Price, Amount
+    function addItemRow(descValue = '', qtyValue = '', rateValue = '', amtValue = '') {
+        const container = document.getElementById('items-container');
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        row.innerHTML = `
+            <input type="text"   class="item-desc" placeholder="Item / service description" value="${descValue}" oninput="updateLivePreview()">
+            <input type="number" class="item-qty"  placeholder="Qty" value="${qtyValue}" min="0" step="any" oninput="calcItemAmt(this); updateLivePreview()">
+            <input type="number" class="item-rate" placeholder="0.00" value="${rateValue}" min="0" step="any" oninput="calcItemAmt(this); updateLivePreview()">
+            <input type="number" class="item-amt"  placeholder="0.00" value="${amtValue}" readonly tabindex="-1">
+            <button class="btn-remove" onclick="removeItemRow(this)">×</button>
+        `;
+        container.appendChild(row);
+        if (qtyValue && rateValue) calcItemAmt(row.querySelector('.item-qty'));
+        updateLivePreview();
+    }
+
+    function calcItemAmt(el) {
+        const row  = el.closest('.item-row');
+        const qty  = parseFloat(row.querySelector('.item-qty').value)  || 0;
+        const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
+        const amtEl = row.querySelector('.item-amt');
+        amtEl.value = (qty && rate) ? (qty * rate).toFixed(2) : '';
+    }
+
+    function removeItemRow(btn) { btn.parentElement.remove(); updateLivePreview(); }
+
+    // Live Render compilation engine tracking 6% SST modifiers
+    function updateLivePreview() {
+        document.getElementById('lbl-rec-num').textContent = document.getElementById('rec-number').value || '---';
+
+        // Tax reference number — show/hide between No and Date
+        const taxRefEnabled = document.getElementById('tax-ref-toggle').checked;
+        const taxRefVal     = document.getElementById('tax-ref-number').value.trim();
+        const taxRefPrefix  = document.getElementById('lbl-tax-ref-prefix');
+        const taxRefOut     = document.getElementById('lbl-tax-ref-out');
+        const showTaxRef    = taxRefEnabled && taxRefVal.length > 0;
+        taxRefPrefix.style.display = showTaxRef ? '' : 'none';
+        taxRefOut.style.display    = showTaxRef ? '' : 'none';
+        if (showTaxRef) taxRefOut.textContent = taxRefVal;
+        document.getElementById('lbl-comp-info').textContent = document.getElementById('company-details').value;
+        document.getElementById('lbl-client-info').textContent = document.getElementById('client-details').value || 'N/A';
+
+        // Currency symbol from selector
+        const currSel = document.getElementById('currency-selector');
+        const currSymbol = currSel ? currSel.value : 'RM';
+        // Update table header
+        const currHeader = document.getElementById('lbl-currency-header');
+        if (currHeader) currHeader.textContent = currSymbol;
+
+        const remarksContent = document.getElementById('custom-remarks-input').value;
+        const remarksContainer = document.getElementById('remarks-render-block');
+        if(remarksContent.trim() === '') {
+            remarksContainer.style.display = 'none';
+        } else {
+            remarksContainer.style.display = 'block';
+            document.getElementById('lbl-custom-remarks').textContent = remarksContent;
+        }
+
+        const rows = document.querySelectorAll('#items-container .item-row');
+        const tableBody = document.getElementById('table-bill-rows');
+        tableBody.innerHTML = '';
+        
+        let subtotal = 0;
+        rows.forEach(row => {
+            const desc    = row.querySelector('.item-desc').value || 'Item';
+            const qty     = parseFloat(row.querySelector('.item-qty').value)  || 0;
+            const rate    = parseFloat(row.querySelector('.item-rate').value) || 0;
+            let   amtVal  = parseFloat(row.querySelector('.item-amt').value);
+            // Fall back: if amt blank, calculate from qty × rate
+            if (isNaN(amtVal)) amtVal = qty * rate;
+            // If still nothing, use whatever is in amt directly
+            if (!qty && !rate) amtVal = parseFloat(row.querySelector('.item-amt').value) || 0;
+            subtotal += amtVal;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${desc}</td>
+                <td class="col-qty">${qty > 0 ? qty : '—'}</td>
+                <td class="col-rate" style="white-space:nowrap;">${rate > 0 ? currSymbol + ' ' + rate.toFixed(2) : '—'}</td>
+                <td class="col-amt" style="white-space:nowrap;">${currSymbol} ${amtVal.toFixed(2)}</td>`;
+            tableBody.appendChild(tr);
+        });
+
+        const isTaxEnabled = document.getElementById('tax-toggle-checkbox') ? document.getElementById('tax-toggle-checkbox').checked : false;
+        const taxAmount = isTaxEnabled ? (subtotal * 0.06) : 0;
+
+        // ── MULTI-TAX ENGINE ──
+        const taxCards = document.querySelectorAll('#tax-rows-panel .tax-row-card');
+        const taxOutputTbody = document.getElementById('tax-output-tbody');
+        taxOutputTbody.innerHTML = '';
+        let totalTaxAmount = 0;
+
+        taxCards.forEach(card => {
+            const enabled  = card.querySelector('.tax-enable-toggle').checked;
+            const taxName  = card.querySelector('input[type="text"]').value.trim() || 'Tax';
+            const taxPct   = parseFloat(card.querySelector('input[type="number"]').value) || 0;
+            if (!enabled || taxPct === 0) return;
+            const taxAmt   = subtotal * (taxPct / 100);
+            totalTaxAmount += taxAmt;
+
+            const tr = document.createElement('tr');
+            tr.className = 'tax-output-row';
+            tr.innerHTML = `
+                <td colspan="3" style="text-align:right;font-style:italic;color:#475569;">${taxName} (${taxPct}%)</td>
+                <td class="col-amt" style="font-style:italic;color:#475569;white-space:nowrap;">${currSymbol} ${taxAmt.toFixed(2)}</td>`;
+            taxOutputTbody.appendChild(tr);
+        });
+
+        const finalGrandTotal = subtotal + totalTaxAmount;
+        const hasTax = totalTaxAmount > 0;
+
+        // Show subtotal only when there's tax
+        const subRow = document.getElementById('render-row-subtotal');
+        if (hasTax) {
+            subRow.style.display = 'table-row';
+            document.getElementById('lbl-calculated-subtotal').textContent = `${currSymbol} ${subtotal.toFixed(2)}`;
+        } else {
+            subRow.style.display = 'none';
+        }
+
+        document.getElementById('lbl-grand-total').textContent = `${currSymbol} ${finalGrandTotal.toFixed(2)}`;
+        saveCurrentState();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // SIGNATURE ENGINE — Canvas, precise per-stroke, no ghost lines
+    // Uses offsetX/offsetY (most accurate) with rect fallback
+    // ══════════════════════════════════════════════════════════
+    (function() {
+        var area   = document.getElementById('sig-draw-area');
+        var hint   = document.getElementById('sig-placeholder');
+        var canvas = document.getElementById('sig-canvas');
+        if (!area || !canvas) return;
+
+        var ctx     = canvas.getContext('2d');
+        var drawing = false;
+        var hasMark = false;
+        var lastX   = 0, lastY = 0;
+        var DPR     = window.devicePixelRatio || 1;
+
+        // ── Size canvas to exactly fill the container ──
+        // Uses physical pixels (DPR) so strokes are crisp on retina
+        function sizeCanvas() {
+            var w = area.clientWidth  || area.offsetWidth  || 300;
+            var h = area.clientHeight || area.offsetHeight || 160;
+            if (w < 10) { setTimeout(sizeCanvas, 100); return; }
+            DPR = window.devicePixelRatio || 1;
+            // Only resize if actually changed
+            if (canvas.width === Math.round(w * DPR) && canvas.height === Math.round(h * DPR)) return;
+            // Snapshot existing drawing
+            var snap = hasMark ? canvas.toDataURL() : null;
+            canvas.width  = Math.round(w * DPR);
+            canvas.height = Math.round(h * DPR);
+            canvas.style.width  = w + 'px';
+            canvas.style.height = h + 'px';
+            ctx.scale(DPR, DPR);
+            styleCtx();
+            // Restore drawing after resize
+            if (snap) {
+                var img = new Image();
+                img.onload = function() { ctx.drawImage(img, 0, 0, w, h); };
+                img.src = snap;
+            }
+        }
+
+        function styleCtx() {
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth   = 2.2;
+            ctx.lineCap     = 'round';
+            ctx.lineJoin    = 'round';
+            ctx.fillStyle   = '#1a1a2e';
+        }
+
+        // ── Get coordinates relative to canvas in CSS pixels ──
+        // On iOS we CANNOT use offsetX/offsetY — they're always 0 on touch events.
+        // We use clientX/clientY minus the canvas rect, which is always correct
+        // as long as we call getBoundingClientRect() at event time (not cached).
+        function getXY(e) {
+            var touch = null;
+            if (e.touches && e.touches.length > 0)                  touch = e.touches[0];
+            else if (e.changedTouches && e.changedTouches.length > 0) touch = e.changedTouches[0];
+
+            var rect = canvas.getBoundingClientRect();
+            var cx   = touch ? touch.clientX : e.clientX;
+            var cy   = touch ? touch.clientY : e.clientY;
+
+            // Convert to CSS-pixel space (already correct — canvas is sized in CSS px)
+            return {
+                x: cx - rect.left,
+                y: cy - rect.top
+            };
+        }
+
+        // ── Draw ──
+        function onDown(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var p   = getXY(e);
+            drawing = true;
+            hasMark = true;
+            lastX   = p.x;
+            lastY   = p.y;
+            if (hint) hint.style.display = 'none';
+            // Begin a new sub-path — CRITICAL: beginPath() isolates this stroke
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            // Draw a dot for single tap
+            ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+        }
+
+        function onMove(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!drawing) return;
+            var p  = getXY(e);
+            var dx = p.x - lastX;
+            var dy = p.y - lastY;
+            // Skip micro-movements (< 1px) to avoid jitter on iOS
+            if (dx * dx + dy * dy < 1) return;
+            // Smooth with midpoint — removes jaggedness without adding ghost lines
+            var mx = (lastX + p.x) / 2;
+            var my = (lastY + p.y) / 2;
+            ctx.quadraticCurveTo(lastX, lastY, mx, my);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(mx, my);
+            lastX = p.x;
+            lastY = p.y;
+        }
+
+        function onUp(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!drawing) return;
+            // Draw final segment to exact lift point
+            var p = getXY(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            ctx.beginPath(); // reset path — isolates from next stroke
+            drawing = false;
+            commitSig();
+        }
+
+        // ── Export canvas to PNG → layer-sig ──
+        function commitSig() {
+            if (!hasMark) return;
+            try {
+                var png = canvas.toDataURL('image/png');
+                var img = document.getElementById('layer-sig');
+                if (img) { img.src = png; img.style.display = 'block'; }
+                if (typeof saveCurrentState === 'function') saveCurrentState();
+            } catch(e) {
+                // Fallback: if toDataURL fails (shouldn't on canvas), silently skip
+                console.warn('Sig export error:', e);
+            }
+        }
+
+        // ── Public API ──
+        window.clearSignatureCanvas = function() {
+            ctx.clearRect(0, 0, canvas.width / DPR, canvas.height / DPR);
+            hasMark = false; drawing = false;
+            if (hint) hint.style.display = '';
+            var img = document.getElementById('layer-sig');
+            if (img) { img.src = ''; img.style.display = 'none'; }
+            if (typeof saveCurrentState === 'function') saveCurrentState();
+        };
+        window.clearSigSVG         = window.clearSignatureCanvas;
+        window.initSignatureCanvas = sizeCanvas;
+        window.commitSigNow        = commitSig;
+
+        // ── Events: capture phase, passive:false — both required for iOS ──
+        var opts = { passive: false, capture: true };
+        canvas.addEventListener('touchstart',  onDown, opts);
+        canvas.addEventListener('touchmove',   onMove, opts);
+        canvas.addEventListener('touchend',    onUp,   opts);
+        canvas.addEventListener('touchcancel', onUp,   opts);
+        // Also block scroll on wrapper
+        area.addEventListener('touchstart', function(e){ e.preventDefault(); }, { passive:false, capture:true });
+        area.addEventListener('touchmove',  function(e){ e.preventDefault(); }, { passive:false, capture:true });
+        // Mouse (desktop)
+        canvas.addEventListener('mousedown',  onDown, { passive: false });
+        canvas.addEventListener('mousemove',  onMove, { passive: false });
+        canvas.addEventListener('mouseup',    onUp,   { passive: false });
+        canvas.addEventListener('mouseleave', onUp,   { passive: false });
+
+        // ── Init: wait for layout to settle ──
+        function trySize() {
+            sizeCanvas();
+            if ((canvas.width || 0) < 10) setTimeout(sizeCanvas, 200);
+        }
+        setTimeout(trySize, 150);
+        window.addEventListener('resize',            function() { setTimeout(sizeCanvas, 100); });
+        window.addEventListener('orientationchange', function() { setTimeout(sizeCanvas, 350); });
+    })();
+
+    // Media Layer Upload Pipeline
+    function handleLogoUpload(event) {
+        const file = event.target.files[0]; if(!file) return;
+        const r = new FileReader(); r.onload = function(e) {
+            document.getElementById(`layer-logo`).src = e.target.result; 
+            document.getElementById(`layer-logo`).style.display = 'block';
+            if(document.getElementById('logo-prompt')) document.getElementById('logo-prompt').style.display = 'none';
+            saveCurrentState();
+        }; r.readAsDataURL(file);
+    }
+    function handleSignatureUpload(event) {
+        const file = event.target.files[0]; if(!file) return;
+        const r = new FileReader(); r.onload = function(e) {
+            document.getElementById(`layer-sig`).src = e.target.result; 
+            document.getElementById(`layer-sig`).style.display = 'block';
+            saveCurrentState();
+        }; r.readAsDataURL(file);
+    }
+    function handleChopUpload(event) {
+        const file = event.target.files[0]; if(!file) return;
+        const r = new FileReader(); r.onload = function(e) {
+            document.getElementById(`layer-chop`).src = e.target.result; 
+            document.getElementById(`layer-chop`).style.display = 'block';
+            saveCurrentState();
+        }; r.readAsDataURL(file);
+    }
+
+    function deleteTargetVisualAsset(assetType) {
+        const targetImage = document.getElementById(`layer-${assetType}`);
+        targetImage.src = '';
+        targetImage.style.display = 'none';
+        
+        if (assetType === 'logo') {
+            const promptZone = document.getElementById('logo-prompt');
+            if(promptZone) promptZone.style.display = 'flex';
+            document.getElementById('upload-logo').value = '';
+        } else if (assetType === 'sig') {
+            clearSignatureCanvas();
+            document.getElementById('upload-sig').value = '';
+        } else if (assetType === 'chop') {
+            document.getElementById('upload-chop').value = '';
+        }
+        saveCurrentState();
+    }
+
+    // OPACITY CONTROL
+    function setAssetOpacity(type, val) {
+        const el = document.getElementById('layer-' + type);
+        if (el) el.style.opacity = val / 100;
+        const lbl = document.getElementById('opacity-' + type + '-val');
+        if (lbl) lbl.textContent = val + '%';
+        saveCurrentState();
+    }
+
+    // SIZE CONTROL — syncs panel inputs → receipt element
+    function setAssetSize(type) {
+        const container = document.getElementById(type + '-drag-container');
+        const wInput = document.getElementById('size-' + type + '-w');
+        const hInput = document.getElementById('size-' + type + '-h');
+        if (!container || !wInput || !hInput) return;
+        const w = Math.max(20, parseInt(wInput.value) || 20);
+        const h = Math.max(20, parseInt(hInput.value) || 20);
+        container.style.width  = w + 'px';
+        container.style.height = h + 'px';
+        saveCurrentState();
+    }
+
+    // Sync size inputs from element (called after drag-resize)
+    function syncSizeInputs(type) {
+        const container = document.getElementById(type + '-drag-container');
+        if (!container) return;
+        const w = parseInt(getComputedStyle(container).width);
+        const h = parseInt(getComputedStyle(container).height);
+        const wI = document.getElementById('size-' + type + '-w');
+        const hI = document.getElementById('size-' + type + '-h');
+        if (wI) wI.value = w;
+        if (hI) hI.value = h;
+    }
+
+    // (drag engine defined in mobile engine block below)
+
+    // Drag engines are initialised by the mobile engine block below
+    // applyInteractionEngine('logo-drag-container', 'logo');
+    // applyInteractionEngine('sig-drag-container',  'sig');
+    // applyInteractionEngine('chop-drag-container', 'chop');
+
+    function processImageToTransparentPNG(imgElement) {
+        if (!imgElement || !imgElement.src || imgElement.src === "" || imgElement.style.display === 'none') return Promise.resolve();
+        if (imgElement.src.startsWith('data:image/svg')) return Promise.resolve();
+        
+        return new Promise((resolve) => {
+            const tempImg = new Image();
+            tempImg.crossOrigin = "anonymous";
+            tempImg.onload = function() {
+                const c = document.createElement('canvas');
+                c.width = tempImg.width; c.height = tempImg.height;
+                const tCtx = c.getContext('2d');
+                tCtx.drawImage(tempImg, 0, 0);
+                try {
+                    const imgData = tCtx.getImageData(0, 0, c.width, c.height);
+                    const data = imgData.data;
+                    
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i], g = data[i+1], b = data[i+2];
+                        if (r > 200 && g > 200 && b > 200) {
+                            data[i+3] = 0; 
+                        }
+                    }
+                    tCtx.putImageData(imgData, 0, 0);
+                    imgElement.src = c.toDataURL('image/png');
+                } catch(e) { console.warn("Canvas restriction bypassed safely."); }
+                resolve();
+            };
+            tempImg.onerror = () => resolve();
+            tempImg.src = imgElement.src;
+        });
+    }
+
+    // ─────────────────────────────────────────────────
+    // PDF GENERATION — downloads a real .pdf file
+    // Works on mobile (no popup window needed)
+    // ─────────────────────────────────────────────────
+    function generateHDReceiptReportPDF() {
+        if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+            alert('PDF library is still loading, please try again in a moment.');
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const workspace = document.getElementById('invoice-workspace');
+        const docNum    = document.getElementById('rec-number').value || 'RECEIPT';
+
+        // Show status
+        const pdfBtns = document.querySelectorAll('#btn-action-pdf, #fab-pdf');
+        pdfBtns.forEach(b => { b.textContent = '⏳ Generating PDF…'; b.disabled = true; });
+
+        // Pre-process transparent assets
+        const cleanSig  = processImageToTransparentPNG(document.getElementById('layer-sig'));
+        const cleanChop = processImageToTransparentPNG(document.getElementById('layer-chop'));
+
+        Promise.all([cleanSig, cleanChop]).then(() => {
+            // Temporarily reset any CSS scale transform so html2canvas captures at full resolution
+            const origTransform       = workspace.style.transform;
+            const origTransformOrigin = workspace.style.transformOrigin;
+            workspace.style.transform       = 'scale(1)';
+            workspace.style.transformOrigin = 'top left';
+            workspace.classList.add('screenshot-mode');
+
+            setTimeout(() => {
+                // Re-export canvas signature to layer-sig PNG before capture
+                var sigRefreshDone = new Promise(function(resolve) {
+                    try {
+                        if (typeof window.commitSigNow === 'function') window.commitSigNow();
+                    } catch(e) {}
+                    setTimeout(resolve, 60);
+                });
+
+                sigRefreshDone.then(function() {
+                // Measure actual document height AFTER reset so we capture everything
+                var actualH = workspace.scrollHeight || workspace.offsetHeight || 842;
+                var actualW = 595;
+
+                html2canvas(workspace, {
+                    scale: 2.5,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                    width:       actualW,
+                    height:      actualH,
+                    windowWidth: actualW,
+                    windowHeight: actualH,
+                    scrollX: 0,
+                    scrollY: 0
+                }).then(canvas => {
+                    // Restore transform
+                    workspace.style.transform       = origTransform;
+                    workspace.style.transformOrigin = origTransformOrigin;
+                    workspace.classList.remove('screenshot-mode');
+
+                    const imgData = canvas.toDataURL('image/png', 1.0);
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+
+                    const pdfW = pdf.internal.pageSize.getWidth();
+                    const pdfH = pdf.internal.pageSize.getHeight();
+                    const margin = 10;
+                    const usableW = pdfW - margin * 2;
+                    const usableH = pdfH - margin * 2;
+                    const imgAspect = canvas.height / canvas.width;
+                    let drawW = usableW;
+                    let drawH = usableW * imgAspect;
+                    if (drawH > usableH) { drawH = usableH; drawW = usableH / imgAspect; }
+
+                    pdf.addImage(imgData, 'PNG', margin, margin, drawW, drawH);
+
+                    // ── iOS-COMPATIBLE PDF DELIVERY ──
+                    // pdf.save() on iPhone names the file after the CDN domain.
+                    // Instead: get raw PDF bytes → make a blob URL → open in Safari's
+                    // built-in PDF viewer → user taps Share to save/send anywhere.
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                    const fileName = 'Receipt_' + docNum + '.pdf';
+
+                    if (isIOS) {
+                        // iOS: open PDF as blob in new tab — Safari renders it natively
+                        // User can then tap Share (□↑) → Save to Files, AirDrop, Mail etc.
+                        const pdfBlob = pdf.output('blob');
+                        const blobUrl = URL.createObjectURL(pdfBlob);
+                        const newTab  = window.open(blobUrl, '_blank');
+                        if (!newTab) {
+                            // Pop-up blocked fallback — create a tap-to-open link
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.target = '_blank';
+                            a.rel = 'noopener';
+                            a.textContent = '📄 Tap to open PDF';
+                            a.style.cssText = 'display:block;margin:12px auto;padding:14px 20px;background:#dc2626;color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:1rem;max-width:300px;text-decoration:none;';
+                            // Show as overlay
+                            const overlay = document.createElement('div');
+                            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;';
+                            const box = document.createElement('div');
+                            box.style.cssText = 'background:#fff;border-radius:12px;padding:24px;text-align:center;max-width:320px;width:90%;';
+                            box.innerHTML = '<p style="font-size:0.9rem;color:#334155;margin-bottom:12px;">✅ PDF is ready!<br>Tap the button below to view and save it.</p>';
+                            box.appendChild(a);
+                            const closeBtn = document.createElement('button');
+                            closeBtn.textContent = 'Close';
+                            closeBtn.style.cssText = 'margin-top:12px;padding:8px 20px;border:none;border-radius:6px;background:#e2e8f0;color:#475569;font-weight:600;cursor:pointer;';
+                            closeBtn.onclick = function() { document.body.removeChild(overlay); URL.revokeObjectURL(blobUrl); };
+                            box.appendChild(closeBtn);
+                            overlay.appendChild(box);
+                            overlay.onclick = function(e) { if(e.target===overlay) closeBtn.onclick(); };
+                            document.body.appendChild(overlay);
+                        }
+                    } else {
+                        // Desktop / Android: standard download
+                        pdf.save(fileName);
+                    }
+
+                    pdfBtns.forEach(b => { b.textContent = b.id === 'fab-pdf' ? '📄 PDF' : '📄 Save Document as PDF'; b.disabled = false; });
+                }).catch(err => {
+                    workspace.style.transform       = origTransform;
+                    workspace.style.transformOrigin = origTransformOrigin;
+                    workspace.classList.remove('screenshot-mode');
+                    pdfBtns.forEach(b => { b.textContent = b.id === 'fab-pdf' ? '📄 PDF' : '📄 Save Document as PDF'; b.disabled = false; });
+                    alert('PDF generation failed. Please try again.');
+                });
+                }); // end sigRefreshDone.then
+            }, 120);
+        });
+    }
+
+    // =========================================================================
+    // PERSISTENCE ENGINE (LOCAL STORAGE / AUTO-SAVE & RECORD STORAGE HISTORY)
+    // =========================================================================
+    function compileCurrentStatePayload() {
+        const itemRows = [];
+        document.querySelectorAll('#items-container .item-row').forEach(row => {
+            itemRows.push({
+                desc: row.querySelector('.item-desc').value,
+                qty:  row.querySelector('.item-qty').value,
+                rate: row.querySelector('.item-rate').value,
+                amt:  row.querySelector('.item-amt').value
+            });
+        });
+
+        // Save all tax rows
+        const taxRowsData = [];
+        document.querySelectorAll('#tax-rows-panel .tax-row-card').forEach(card => {
+            taxRowsData.push({
+                name:    card.querySelector('input[type="text"]').value,
+                pct:     card.querySelector('input[type="number"]').value,
+                enabled: card.querySelector('.tax-enable-toggle').checked
+            });
+        });
+
+        return {
+            appLanguage: currentSelectedLanguage,
+            customTitle: document.getElementById('custom-title-input').value,
+            recNumber: document.getElementById('rec-number').value,
+            docDate: document.getElementById('lbl-date').textContent,
+            companyDetails: document.getElementById('company-details').value,
+            clientDetails: document.getElementById('client-details').value,
+            customRemarks: document.getElementById('custom-remarks-input').value,
+            authRep: document.getElementById('auth-rep-input').value,
+            currency: document.getElementById('currency-selector').value,
+            taxRefEnabled: document.getElementById('tax-ref-toggle').checked,
+            taxRefNumber:  document.getElementById('tax-ref-number').value,
+            taxRows: taxRowsData,
+            items: itemRows,
+            logoSrc: document.getElementById('layer-logo').src || '',
+            sigSrc: document.getElementById('layer-sig').src || '',
+            chopSrc: document.getElementById('layer-chop').src || '',
+            layout: {
+                logo: { left: document.getElementById('logo-drag-container').style.left, top: document.getElementById('logo-drag-container').style.top, w: document.getElementById('logo-drag-container').style.width, h: document.getElementById('logo-drag-container').style.height },
+                sig: { left: document.getElementById('sig-drag-container').style.left, top: document.getElementById('sig-drag-container').style.top, w: document.getElementById('sig-drag-container').style.width, h: document.getElementById('sig-drag-container').style.height },
+                chop: { left: document.getElementById('chop-drag-container').style.left, top: document.getElementById('chop-drag-container').style.top, w: document.getElementById('chop-drag-container').style.width, h: document.getElementById('chop-drag-container').style.height }
+            }
+        };
+    }
+
+    function saveCurrentState() {
+        const payload = compileCurrentStatePayload();
+        localStorage.setItem('receipt_studio_last_autosave_v8', JSON.stringify(payload));
+    }
+
+    function applyTargetStateToUi(db) {
+        const savedLang = db.appLanguage || "en";
+        document.getElementById('lang-selector').value = savedLang;
+        currentSelectedLanguage = savedLang;
+
+        document.getElementById('custom-title-input').value = db.customTitle || 'OFFICIAL RECEIPT';
+        document.getElementById('lbl-doc-type').textContent = db.customTitle || 'OFFICIAL RECEIPT';
+        document.getElementById('rec-number').value = db.recNumber || '';
+        document.getElementById('lbl-date').textContent = db.docDate || '13/06/2026';
+        
+        document.getElementById('company-details').value = db.companyDetails || 'Apex Global Solutions Ltd\n100 Innovation Way, Tech District';
+        document.getElementById('client-details').value = db.clientDetails || '';
+        document.getElementById('custom-remarks-input').value = db.customRemarks !== undefined ? db.customRemarks : '';
+
+        // Restore authorised representative
+        const authRepVal = db.authRep || 'Authorized Representative';
+        document.getElementById('auth-rep-input').value = authRepVal;
+        document.getElementById('lbl-auth-rep').textContent = authRepVal;
+
+        // Restore currency
+        if (db.currency) {
+            const sel = document.getElementById('currency-selector');
+            const match = Array.from(sel.options).find(o => o.value === db.currency);
+            if (match) sel.value = db.currency;
+        }
+
+        // Restore tax reference number
+        const taxRefToggle = document.getElementById('tax-ref-toggle');
+        taxRefToggle.checked = db.taxRefEnabled || false;
+        document.getElementById('tax-ref-number').value = db.taxRefNumber || '';
+        document.getElementById('tax-ref-group').style.display = db.taxRefEnabled ? 'block' : 'none';
+
+        // Restore tax rows
+        document.getElementById('tax-rows-panel').innerHTML = '';
+        taxRowCounter = 0;
+        if (db.taxRows && db.taxRows.length > 0) {
+            db.taxRows.forEach(t => addTaxRow(t.name, t.pct, t.enabled !== false));
+        } else if (db.taxEnabled) {
+            // Backwards compatibility: old saves had taxEnabled + fixed 6% SST
+            addTaxRow('SST', '6', true);
+        }
+
+        document.getElementById('tax-toggle-checkbox') && (document.getElementById('tax-toggle-checkbox').checked = db.taxEnabled !== undefined ? db.taxEnabled : true);
+        
+        document.getElementById('items-container').innerHTML = '';
+        if (db.items && db.items.length > 0) {
+            db.items.forEach(it => addItemRow(it.desc, it.qty || '', it.rate || '', it.amt));
+        } else {
+            addItemRow('Professional Technical Consulting & Strategy Implementation', '1', '4500.00', '4500.00');
+        }
+
+        if (db.logoSrc && db.logoSrc !== window.location.href && db.logoSrc !== "") {
+            document.getElementById('layer-logo').src = db.logoSrc; document.getElementById('layer-logo').style.display = 'block';
+            if(document.getElementById('logo-prompt')) document.getElementById('logo-prompt').style.display = 'none';
+        } else {
+            document.getElementById('layer-logo').src = ''; document.getElementById('layer-logo').style.display = 'none';
+            if(document.getElementById('logo-prompt')) document.getElementById('logo-prompt').style.display = 'flex';
+        }
+        
+        if (db.sigSrc && db.sigSrc !== window.location.href && db.sigSrc !== "") {
+            document.getElementById('layer-sig').src = db.sigSrc; document.getElementById('layer-sig').style.display = 'block';
+        } else { document.getElementById('layer-sig').src = ''; document.getElementById('layer-sig').style.display = 'none'; }
+        
+        if (db.chopSrc && db.chopSrc !== window.location.href && db.chopSrc !== "") {
+            document.getElementById('layer-chop').src = db.chopSrc; document.getElementById('layer-chop').style.display = 'block';
+        } else { document.getElementById('layer-chop').src = ''; document.getElementById('layer-chop').style.display = 'none'; }
+
+        if (db.layout) {
+            const assignLayout = (id, target) => {
+                const el = document.getElementById(id);
+                if (target.left) el.style.left = target.left; if (target.top) el.style.top = target.top;
+                if (target.w) el.style.width = target.w; if (target.h) el.style.height = target.h;
+            };
+            if(db.layout.logo) assignLayout('logo-drag-container', db.layout.logo);
+            if(db.layout.sig) assignLayout('sig-drag-container', db.layout.sig);
+            if(db.layout.chop) assignLayout('chop-drag-container', db.layout.chop);
+        }
+        
+        toggleAppLanguage(savedLang);
+        updateLivePreview();
+    }
+
+    function loadSavedState() {
+        const rawDb = localStorage.getItem('receipt_studio_last_autosave_v8');
+        if (!rawDb) {
+            addItemRow('Professional Technical Consulting & Strategy Implementation', '1', '4500.00', '4500.00');
+            toggleAppLanguage("en");
+            return;
+        }
+        applyTargetStateToUi(JSON.parse(rawDb));
+    }
+
+    // PROGRESSIVE WEB APP (PWA) OFFLINE SERVICE WORKER ENGINE
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); deferredPrompt = e;
+        const installBtn = document.getElementById('btn-install');
+        if(installBtn) installBtn.style.display = 'flex';
+    });
+
+    document.getElementById('btn-install').addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') { document.getElementById('btn-install').style.display = 'none'; }
+        deferredPrompt = null;
+    });
+
+    if ('serviceWorker' in navigator) {
+        const swBlobCode = `
+            const CACHE_NAME = 'receipt-studio-cache-v8';
+            self.addEventListener('install', e => {
+                e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['./', './index.html'])));
+            });
+            self.addEventListener('fetch', e => {
+                e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+            });
+        `;
+        const swBlob = new Blob([swBlobCode], {type: 'application/javascript'});
+        const swUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swUrl, {scope: './'}).catch(() => {});
+    }
+
+    const todayObject = new Date();
+    document.getElementById('control-date-picker').value = todayObject.toISOString().slice(0,10);
+    loadSavedState();
+    // Add a default SST row if no saved state loaded any
+    if (document.querySelectorAll('#tax-rows-panel .tax-row-card').length === 0) {
+        addTaxRow('SST', '6', true);
+    }
+</script>
+
+<!-- ══ MOBILE TAB BAR ══ -->
+<nav class="mobile-tabs" id="mobile-tabs">
+    <button class="mobile-tab is-active" id="mtab-edit" onclick="mobileGoTo('edit')">
+        <span class="t-icon">✏️</span><span>Edit</span>
+    </button>
+    <button class="mobile-tab" id="mtab-preview" onclick="mobileGoTo('preview')">
+        <span class="t-icon">👁️</span><span>Preview</span>
+    </button>
+</nav>
+
+<!-- ══ MOBILE FLOATING PDF BUTTON ══ -->
+<button class="fab-pdf" id="fab-pdf" onclick="generateHDReceiptReportPDF()" style="display:none;">📄 PDF</button>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// MOBILE ENGINE v3 — Tested for iPhone Safari local file
+// ════════════════════════════════════════════════════════════════
+
+// ── TAB NAVIGATION ──
+function mobileGoTo(tab) {
+    var isEdit = (tab === 'edit');
+    var me  = document.getElementById('mtab-edit');
+    var mp  = document.getElementById('mtab-preview');
+    var fab = document.getElementById('fab-pdf');
+    if (me)  me.classList.toggle('is-active', isEdit);
+    if (mp)  mp.classList.toggle('is-active', !isEdit);
+    if (fab) fab.style.display = isEdit ? 'none' : 'flex';
+    var target = document.getElementById(isEdit ? 'section-edit' : 'section-preview');
+    if (target) {
+        // scrollIntoView works on all iOS versions
+        target.scrollIntoView(true);
+    }
+}
+
+// ── RECEIPT ZOOM ──
+var _rScale = 1.0;
+
+function _applyScale(s) {
+    _rScale = Math.min(3.0, Math.max(0.2, s));
+    var dv  = document.getElementById('invoice-workspace');
+    var lbl = document.getElementById('zoom-label');
+    if (!dv) return;
+    // Use both webkit and standard transforms
+    var t = 'scale(' + _rScale + ')';
+    dv.style.webkitTransform       = t;
+    dv.style.transform             = t;
+    dv.style.webkitTransformOrigin = 'top left';
+    dv.style.transformOrigin       = 'top left';
+    // Fix wrapper height so content below isn't hidden
+    var wrap = dv.parentNode;
+    if (wrap) {
+        var nh = (dv.scrollHeight || 842) * _rScale + 40;
+        var nw = 595 * _rScale;
+        wrap.style.height    = nh + 'px';
+        wrap.style.overflowX = (nw > window.innerWidth) ? 'scroll' : 'hidden';
+    }
+    if (lbl) lbl.textContent = Math.round(_rScale * 100) + '%';
+}
+
+// Called by zoom +/- buttons
+function adjustReceiptZoom(d) { _applyScale(_rScale + d); }
+
+// Fit to screen width
+function resetReceiptZoom() {
+    var dv = document.getElementById('invoice-workspace');
+    if (!dv) return;
+    if (window.innerWidth > 900) {
+        // Desktop: clear transforms
+        dv.style.webkitTransform = '';
+        dv.style.transform       = '';
+        var wrap = dv.parentNode;
+        if (wrap) { wrap.style.height = ''; wrap.style.overflowX = 'auto'; }
+        _rScale = 1.0;
+        var lbl = document.getElementById('zoom-label');
+        if (lbl) lbl.textContent = '100%';
+    } else {
+        // Mobile: fit 595px receipt inside screen
+        var avail = window.innerWidth - 16;
+        _applyScale(avail / 595);
+    }
+}
+
+// ── PINCH ZOOM on receipt wrapper ──
+(function() {
+    var initDist  = 0;
+    var initScale = 1.0;
+
+    function dist(e) {
+        var dx = e.touches[0].clientX - e.touches[1].clientX;
+        var dy = e.touches[0].clientY - e.touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function onTS(e) {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            initDist  = dist(e);
+            initScale = _rScale;
+        }
+    }
+    function onTM(e) {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            _applyScale(initScale * dist(e) / initDist);
+        }
+    }
+
+    window.addEventListener('load', function() {
+        var wrap = document.querySelector('.document-scroll-wrapper');
+        if (!wrap) return;
+        wrap.addEventListener('touchstart', onTS, { passive: false });
+        wrap.addEventListener('touchmove',  onTM, { passive: false });
+    });
+})();
+
+// ── ASSET DRAG + RESIZE ──
+function applyInteractionEngine(elId, assetType) {
+    var el  = document.getElementById(elId);
+    if (!el) return;
+    var rh  = el.querySelector('.resize-handle');
+    var act = null, sx = 0, sy = 0, sw = 0, sh = 0, sl = 0, st = 0;
+
+    // iOS requires these set before any touch fires
+    el.style.touchAction        = 'none';
+    el.style.webkitUserSelect   = 'none';
+    el.style.userSelect         = 'none';
+    el.style.webkitTouchCallout = 'none';
+
+    function getS() {
+        var ws = document.getElementById('invoice-workspace');
+        if (!ws) return 1;
+        var m = (ws.style.transform || ws.style.webkitTransform || '').match(/scale\(([^)]+)\)/);
+        return m ? parseFloat(m[1]) : 1;
+    }
+    function pt(e) {
+        var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+        return { x: t.clientX, y: t.clientY };
+    }
+    function dn(e) {
+        e.preventDefault(); e.stopPropagation();
+        var p = pt(e);
+        if (rh && (e.target === rh || rh.contains(e.target))) {
+            act = 'r'; sw = el.offsetWidth; sh = el.offsetHeight;
+        } else {
+            act = 'd'; sl = el.offsetLeft; st = el.offsetTop;
+        }
+        sx = p.x; sy = p.y;
+    }
+    function mv(e) {
+        if (!act) return;
+        e.preventDefault(); e.stopPropagation();
+        var p = pt(e), s = getS();
+        var dx = (p.x - sx) / s, dy = (p.y - sy) / s;
+        if (act === 'd') { el.style.left = (sl + dx) + 'px'; el.style.top = (st + dy) + 'px'; }
+        else { el.style.width = Math.max(28, sw + dx) + 'px'; el.style.height = Math.max(18, sh + dy) + 'px'; }
+    }
+    function up(e) {
+        if (!act) return;
+        act = null; e.stopPropagation();
+        if (typeof syncSizeInputs === 'function') syncSizeInputs(assetType);
+        if (typeof saveCurrentState === 'function') saveCurrentState();
+    }
+
+    var o = { passive: false };
+    el.addEventListener('mousedown',   dn, o);
+    el.addEventListener('mousemove',   mv, o);
+    el.addEventListener('mouseup',     up, o);
+    el.addEventListener('touchstart',  dn, o);
+    el.addEventListener('touchmove',   mv, o);
+    el.addEventListener('touchend',    up, o);
+    el.addEventListener('touchcancel', up, o);
+}
+
+// ── INIT ──
+function _initAll() {
+    resetReceiptZoom();
+}
+
+window.addEventListener('load',              function() { setTimeout(_initAll, 250); });
+window.addEventListener('resize',           function() { setTimeout(_initAll, 150); });
+window.addEventListener('orientationchange',function() { setTimeout(_initAll, 450); });
+
+window.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        applyInteractionEngine('logo-drag-container', 'logo');
+        applyInteractionEngine('sig-drag-container',  'sig');
+        applyInteractionEngine('chop-drag-container', 'chop');
+    }, 400);
+});
+</script>
+
+</body>
+</html>
